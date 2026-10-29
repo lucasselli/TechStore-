@@ -1,74 +1,57 @@
 
+
 <?php
-require_once 'conexao.php';
-?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Produtos | TechStore</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body>
+header('Content-Type: application/json; charset=utf-8');
 
-<header>
-    <a href="index.php" class="marca">
-        <span class="logo-simbolo">T</span>
-        <span class="logo-texto">Tech<span>Store</span><small>.</small></span>
-    </a>
+try {
+    $token = getenv('TECHSTORE_API_TOKEN');
 
-    <nav>
-        <a href="index.php">Início</a>
-        <a href="catalogo.php" class="ativo">Produtos</a>
-        <a href="login.php">Minha conta</a>
-        <a href="carrinho.php">Carrinho</a>
-    </nav>
-</header>
+    if (!$token) {
+        http_response_code(500);
+        echo json_encode(['erro' => 'Token da API não configurado.']);
+        exit;
+    }
 
-<main class="container secao">
-    <div class="secao-cabecalho">
-        <div>
-            <span class="sobretitulo">TECHSTORE</span>
-            <h1>Catálogo de produtos</h1>
-            <p class="subtitulo">Consulte e gerencie os produtos da loja.</p>
-        </div>
+    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
-        <a href="produto-novo.php" class="btn">Cadastrar produto +</a>
-    </div>
+    if (isset($_GET['id']) && (!$id || $id < 1)) {
+        http_response_code(400);
+        echo json_encode(['erro' => 'ID inválido.']);
+        exit;
+    }
 
-    <p id="mensagem" role="status"></p>
+    $url = 'http://localhost/techstore/api/produtos.php';
 
-    <div class="tabela-container">
-        <table class="tabela-produtos">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Produto</th>
-                    <th>Preço</th>
-                    <th>Quantidade</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody id="lista-produtos">
-                <tr>
-                    <td colspan="5">Aguardando conexão com a API...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</main>
+    if ($id !== null && $id !== false) {
+        $url .= '?id=' . $id;
+    }
 
-<footer>
-    <a href="index.php" class="marca marca-footer">
-        <span class="logo-simbolo">T</span>
-        <span class="logo-texto">Tech<span>Store</span><small>.</small></span>
-    </a>
+    $curl = curl_init($url);
 
-    <p>Tecnologia para ir além.</p>
-    <span class="copyright">TechStore © 2026 — Projeto acadêmico.</span>
-</footer>
-<script src="assets/js/catalogo.js"></script>
-</body>
-</html>
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $token
+        ],
+        CURLOPT_TIMEOUT => 10
+    ]);
+
+    $resposta = curl_exec($curl);
+
+    if ($resposta === false) {
+        curl_close($curl);
+        throw new RuntimeException('Não foi possível consultar a API.');
+    }
+
+    $codigo = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    curl_close($curl);
+
+    http_response_code($codigo);
+    echo $resposta;
+
+} catch (Throwable $e) {
+    error_log($e->getMessage());
+    http_response_code(500);
+    echo json_encode(['erro' => 'Não foi possível consultar os produtos.']);
+}
